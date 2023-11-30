@@ -10,14 +10,21 @@ type Node struct {
 	Children           []*Node
 	Parent             *Node
 	LastSeen           time.Time
-	Id                 string `json:"id"`
-	ParentId           string `json:"parentId"`
-	ETX                int    `json:"etx"`
-	NumberOfSlotNeeded int    `json:"-"`
-	Slots              []int  `json:"slots"`
+	Id                 string      `json:"id"`
+	ParentId           string      `json:"parentId"`
+	ETX                int         `json:"etx"`
+	NumberOfSlotNeeded int         `json:"-"`
+	EmittingSlots      map[int]int `json:"emittingSlots"`
+	ListeningSlots     map[int]int `json:"listeningSlots"`
 }
 
-func NewNode(parentId string, id string, etx int, slots []int) *Node {
+func NewNode(parentId string, id string, etx int, emittingSlots, listeninSlots map[int]int) *Node {
+	if emittingSlots == nil {
+		emittingSlots = make(map[int]int)
+	}
+	if listeninSlots == nil {
+		listeninSlots = make(map[int]int)
+	}
 	return &Node{
 		Children:           nil,
 		Parent:             nil,
@@ -26,7 +33,8 @@ func NewNode(parentId string, id string, etx int, slots []int) *Node {
 		ParentId:           parentId,
 		ETX:                etx,
 		NumberOfSlotNeeded: 0,
-		Slots:              slots,
+		EmittingSlots:      emittingSlots,
+		ListeningSlots:     listeninSlots,
 	}
 }
 
@@ -34,6 +42,19 @@ func (n *Node) LockNode() func() {
 	n.mtx.Lock()
 	return func() {
 		n.mtx.Unlock()
+	}
+}
+
+func (n *Node) AddChild(node *Node) {
+	n.Children = append(n.Children, node)
+}
+
+func (n *Node) RemoveChild(node *Node) {
+	for i, child := range n.Children {
+		if child == node {
+			n.Children = append(n.Children[:i], n.Children[i+1:]...)
+			return
+		}
 	}
 }
 
@@ -47,12 +68,13 @@ func (n *Node) IsChildren(node *Node) bool {
 	return true
 }
 
-func (n *Node) AddNeededSlot() {
+// AddNeededSlotToParent adds the number of slot needed to the parent and recursively to the parent's parent
+func (n *Node) AddNeededSlotToParent() {
 	if n.Parent == nil {
 		return
 	}
 	n.Parent.NumberOfSlotNeeded += n.Parent.ETX
-	n.Parent.AddNeededSlot()
+	n.Parent.AddNeededSlotToParent()
 }
 
 func (n *Node) Rank() int {

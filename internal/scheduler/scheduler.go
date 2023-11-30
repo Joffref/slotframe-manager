@@ -12,51 +12,41 @@ type Scheduler struct {
 	dodag       *graph.DoDAG
 }
 
-func (s *Scheduler) Register(parentId string, id string, etx int, input api.RegisterReponse) (*api.RegisterReponse, error) {
-	if !s.dodag.IsNode(parentId) {
-		return nil, api.ErrorParentNodeDoesNotExist{ParentId: parentId}
-	}
-	if s.dodag.IsNode(id) {
-		slots := s.dodag.Nodes[id].Slots
-		s.dodag.Nodes[id].LastSeen = time.Now()
-		return &api.RegisterReponse{
-			Slots: slots,
-		}, nil
-	}
-	node := graph.NewNode(parentId, id, etx, input.Slots)
-	s.dodag.AddNode(node)
-	slots := s.scheduleNode(node)
-	return &api.RegisterReponse{
-		Slots: slots,
-	}, nil
-}
-
 func NewScheduler(dodag *graph.DoDAG, rankingFunc func([]*graph.Node) []*graph.Node, frameSize int) *Scheduler {
 	return &Scheduler{
 		RankingFunc: rankingFunc,
-		Frame:       NewFrame(frameSize),
+		Frame:       NewFrame(16, frameSize),
 		dodag:       dodag,
 	}
 }
 
-func (s *Scheduler) Schedule() *Frame {
-	nodes := make([]*graph.Node, 0, len(s.dodag.Nodes))
-	for _, node := range s.dodag.Nodes {
-		nodes = append(nodes, node)
+func (s *Scheduler) Register(parentId string, id string, etx int, input api.Slots) (*api.Slots, error) {
+	if !s.dodag.IsNode(parentId) {
+		return nil, api.ErrorParentNodeDoesNotExist{ParentId: parentId}
 	}
-	nodes = s.RankingFunc(nodes)
-	for _, node := range nodes {
-		s.scheduleNode(node)
+	if s.dodag.IsNode(id) {
+		s.dodag.Nodes[id].LastSeen = time.Now()
+		return &api.Slots{
+			EmittingSlots:  s.dodag.Nodes[id].EmittingSlots,
+			ListeningSlots: s.dodag.Nodes[id].ListeningSlots,
+		}, nil
 	}
-	return s.Frame
+	node := graph.NewNode(parentId, id, etx, input.EmittingSlots, input.ListeningSlots)
+	s.dodag.AddNode(node)
+	return &api.Slots{
+		EmittingSlots:  node.EmittingSlots,
+		ListeningSlots: node.ListeningSlots,
+	}, nil
 }
 
-func (s *Scheduler) scheduleNode(node *graph.Node) []int {
-	for _, slot := range s.Frame.Slots {
-		if !slot.AddNode(node) {
-			continue
-		}
-		panic("TODO")
+func (s *Scheduler) Schedule() {
+	for {
+		currentVersion := s.Frame.Version
+		s.Frame = ComputeFrame(s.dodag, 0, 0)
+		s.Frame.Version = currentVersion + 1
 	}
-	return nil
+}
+
+func (s *Scheduler) Version() int {
+	return s.Frame.Version
 }
