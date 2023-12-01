@@ -1,21 +1,25 @@
 package graph
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
 
 type Node struct {
-	mtx                sync.Mutex
-	Children           []*Node
-	Parent             *Node
-	LastSeen           time.Time
-	Id                 string      `json:"id"`
-	ParentId           string      `json:"parentId"`
-	ETX                int         `json:"etx"`
-	NumberOfSlotNeeded int         `json:"-"`
-	EmittingSlots      map[int]int `json:"emittingSlots"`
-	ListeningSlots     map[int]int `json:"listeningSlots"`
+	mtx            sync.Mutex
+	Children       []*Node
+	Parent         *Node
+	LastSeen       time.Time
+	Id             string      `json:"id"`
+	ParentId       string      `json:"parentId"`
+	ETX            int         `json:"etx"`
+	EmittingSlots  map[int]int `json:"emittingSlots"`
+	ListeningSlots map[int]int `json:"listeningSlots"`
+}
+
+func (n *Node) String() string {
+	return fmt.Sprintf("Node %s (parent: %s, etx: %d, emittingSlots: %v, listeningSlots: %v)", n.Id, n.ParentId, n.ETX, n.EmittingSlots, n.ListeningSlots)
 }
 
 func NewNode(parentId string, id string, etx int, emittingSlots, listeninSlots map[int]int) *Node {
@@ -26,15 +30,14 @@ func NewNode(parentId string, id string, etx int, emittingSlots, listeninSlots m
 		listeninSlots = make(map[int]int)
 	}
 	return &Node{
-		Children:           nil,
-		Parent:             nil,
-		LastSeen:           time.Now(),
-		Id:                 id,
-		ParentId:           parentId,
-		ETX:                etx,
-		NumberOfSlotNeeded: 0,
-		EmittingSlots:      emittingSlots,
-		ListeningSlots:     listeninSlots,
+		Children:       nil,
+		Parent:         nil,
+		LastSeen:       time.Now(),
+		Id:             id,
+		ParentId:       parentId,
+		ETX:            etx,
+		EmittingSlots:  emittingSlots,
+		ListeningSlots: listeninSlots,
 	}
 }
 
@@ -66,15 +69,6 @@ func (n *Node) IsChildren(node *Node) bool {
 		return n.Parent.IsChildren(node)
 	}
 	return true
-}
-
-// AddNeededSlotToParent adds the number of slot needed to the parent and recursively to the parent's parent
-func (n *Node) AddNeededSlotToParent() {
-	if n.Parent == nil {
-		return
-	}
-	n.Parent.NumberOfSlotNeeded += n.Parent.ETX
-	n.Parent.AddNeededSlotToParent()
 }
 
 func (n *Node) Rank() int {

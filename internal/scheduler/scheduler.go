@@ -1,22 +1,64 @@
 package scheduler
 
 import (
+	"fmt"
 	"github.com/Joffref/slotframe-manager/internal/api"
 	"github.com/Joffref/slotframe-manager/internal/graph"
+	"log/slog"
+	"os"
 	"time"
 )
 
-type Scheduler struct {
-	RankingFunc func([]*graph.Node) []*graph.Node
-	Frame       *Frame
-	dodag       *graph.DoDAG
+type Config struct {
+	FrameSize     int    `mapstructure:"frameSize"`
+	NumberCh      int    `mapstructure:"numberCh"`
+	LogLevel      string `mapstructure:"logLevel"`
+	api.APIConfig `mapstructure:",squash"`
 }
 
-func NewScheduler(dodag *graph.DoDAG, rankingFunc func([]*graph.Node) []*graph.Node, frameSize int) *Scheduler {
+func (c *Config) Validate() error {
+	if c.FrameSize <= 0 {
+		return fmt.Errorf("invalid frame size: %d, must be greater than 0", c.FrameSize)
+	}
+	if c.NumberCh <= 0 {
+		return fmt.Errorf("invalid number of channels: %d, must be greater than 0", c.NumberCh)
+	}
+	if c.LogLevel == "" {
+		c.LogLevel = "info"
+	}
+	if c.Address == "" {
+		c.Address = ":5688"
+	}
+	var level slog.Level
+	switch c.LogLevel {
+	case "debug":
+		level = slog.LevelDebug
+	case "info":
+		level = slog.LevelInfo
+	default:
+		slog.Error("Invalid log level, using info")
+		level = slog.LevelInfo
+	}
+	opts := slog.HandlerOptions{
+		Level: level,
+	}
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &opts))
+	slog.SetDefault(logger)
+	return nil
+}
+
+type Scheduler struct {
+	cfg   *Config
+	Frame *Frame
+	dodag *graph.DoDAG
+}
+
+func NewScheduler(dodag *graph.DoDAG, cfg *Config) *Scheduler {
+	slog.Debug("Creating scheduler")
 	return &Scheduler{
-		RankingFunc: rankingFunc,
-		Frame:       NewFrame(16, frameSize),
-		dodag:       dodag,
+		cfg:   cfg,
+		Frame: NewFrame(cfg.FrameSize, cfg.NumberCh),
+		dodag: dodag,
 	}
 }
 
@@ -42,8 +84,9 @@ func (s *Scheduler) Register(parentId string, id string, etx int, input api.Slot
 func (s *Scheduler) Schedule() {
 	for {
 		currentVersion := s.Frame.Version
-		s.Frame = ComputeFrame(s.dodag, 0, 0)
+		s.Frame = ComputeFrame(s.dodag, s.cfg.FrameSize, s.cfg.NumberCh)
 		s.Frame.Version = currentVersion + 1
+		time.Sleep(5 * time.Second)
 	}
 }
 

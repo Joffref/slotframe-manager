@@ -1,8 +1,10 @@
 package api
 
 import (
+	"fmt"
 	"github.com/plgd-dev/go-coap/v3"
 	"github.com/plgd-dev/go-coap/v3/mux"
+	"log/slog"
 )
 
 type APIConfig struct {
@@ -16,6 +18,7 @@ type API struct {
 }
 
 func NewAPI(config *APIConfig, handlers Handler) (*API, error) {
+	slog.Debug("Creating API")
 	a := &API{
 		cfg:      config,
 		handlers: handlers,
@@ -27,9 +30,11 @@ func NewAPI(config *APIConfig, handlers Handler) (*API, error) {
 		return nil, err
 	}
 	a.router = r
+	slog.Debug("API created")
 	return a, nil
 }
 
 func (a *API) Run() error {
+	slog.Debug(fmt.Sprintf("Starting API on %s", a.cfg.Address))
 	return coap.ListenAndServe("udp", a.cfg.Address, a.router)
 }

@@ -1,0 +1,4 @@
+address: ":5688"
+frameSize: 50
+numberCh: 5
+logLevel: "debug"
