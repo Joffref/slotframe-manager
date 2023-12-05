@@ -3,11 +3,12 @@ package scheduler
 import (
 	"fmt"
 	"github.com/Joffref/slotframe-manager/internal/graph"
+	"log/slog"
 )
 
 type Frame struct {
-	Version int           // Version is the version of the frame
-	Slots   map[int]*Slot // Slots is a map of slots indexed by their id
+	Version int     // Version is the version of the frame
+	Slots   []*Slot // Slots is a map of slots indexed by their id
 }
 
 type Slot struct {
@@ -18,7 +19,7 @@ type Slot struct {
 }
 
 func NewFrame(size, channelPerSlot int) *Frame {
-	slots := make(map[int]*Slot, size)
+	slots := make([]*Slot, size)
 	for i := 0; i < size; i++ {
 		slots[i] = NewSlot(i, channelPerSlot)
 	}
@@ -68,29 +69,36 @@ func (s *Slot) AddNode(node *graph.Node) bool {
 	return false
 }
 
-func ComputeFrame(dodag *graph.DoDAG, frameSize int, chanSize int) *Frame {
+func ComputeFrame(dodag *graph.DoDAG, frameSize int, chanSize int) (*Frame, error) {
+	slog.Debug(fmt.Sprintf("Computing frame with %d slots and %d channels per slot", frameSize, chanSize))
 	frame := NewFrame(frameSize, chanSize)
 	nodes := rankNodes(dodag)
 	for i := len(nodes); i > 0; i-- { // Reverse loop on nodes to start from the highest rank and go up in the graph
-		for _, node := range nodes[i] {
-			if node.Parent == nil {
-				continue
-			}
+		slog.Debug(fmt.Sprintf("Giving slots to nodes of rank %d", i-1))
+		for _, node := range nodes[i-1] {
 			if err := frame.GiveSlots(0, node); err != nil {
-				return nil
+				return nil, err
 			}
 		}
 	}
-	return frame
+	return frame, nil
 }
 
 func (s *Frame) GiveSlots(startAt int, node *graph.Node) error {
+	if node.Parent == nil {
+		slog.Debug(fmt.Sprintf("%s has no parent, won't give it slots as it is the root", node.Id))
+		return nil
+	}
+	slog.Debug(fmt.Sprintf("Giving slots to %s", node.Id))
 	neededSlots := node.ETX
+	slog.Debug(fmt.Sprintf("Node %s needs %d slots", node.Id, neededSlots))
+	slog.Debug(fmt.Sprintf("Slots number: %d", len(s.Slots)))
 	for i, slot := range s.Slots {
 		if i < startAt {
 			continue
 		}
 		if slot.AddNode(node) {
+			slog.Debug(fmt.Sprintf("Giving slot %d to %s", i, node.Id))
 			neededSlots--
 		}
 		if neededSlots == 0 {

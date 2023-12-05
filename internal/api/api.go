@@ -29,6 +29,10 @@ func NewAPI(config *APIConfig, handlers Handler) (*API, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = r.Handle("/version", mux.HandlerFunc(a.Version))
+	if err != nil {
+		return nil, err
+	}
 	a.router = r
 	slog.Debug("API created")
 	return a, nil

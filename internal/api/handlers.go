@@ -10,6 +10,7 @@ import (
 	"strconv"
 )
 
+//go:generate mockgen -package api -destination=./mock_api_handler.go . Handler
 type Handler interface {
 	Register(parentId string, id string, etx int, input Slots) (*Slots, error)
 	Version() int
@@ -73,7 +74,7 @@ func (a *API) Version(w mux.ResponseWriter, r *mux.Message) {
 		}
 		return
 	}
-	err = w.SetResponse(codes.Content, message.TextPlain, bytes.NewReader([]byte(resp)))
+	err = w.SetResponse(codes.Content, message.TextPlain, bytes.NewReader(resp))
 	if err != nil {
 		log.Printf("cannot set response: %v", err)
 		return

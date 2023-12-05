@@ -63,7 +63,10 @@ func NewScheduler(dodag *graph.DoDAG, cfg *Config) *Scheduler {
 }
 
 func (s *Scheduler) Register(parentId string, id string, etx int, input api.Slots) (*api.Slots, error) {
-	if !s.dodag.IsNode(parentId) {
+	if parentId == "0" {
+		parentId = ""
+	}
+	if !s.dodag.IsNode(parentId) && parentId != "" {
 		return nil, api.ErrorParentNodeDoesNotExist{ParentId: parentId}
 	}
 	if s.dodag.IsNode(id) {
@@ -84,7 +87,13 @@ func (s *Scheduler) Register(parentId string, id string, etx int, input api.Slot
 func (s *Scheduler) Schedule() {
 	for {
 		currentVersion := s.Frame.Version
-		s.Frame = ComputeFrame(s.dodag, s.cfg.FrameSize, s.cfg.NumberCh)
+		frame, err := ComputeFrame(s.dodag, s.cfg.FrameSize, s.cfg.NumberCh)
+		if err != nil {
+			slog.Error(fmt.Sprintf("cannot compute frame: %v", err))
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		s.Frame = frame
 		s.Frame.Version = currentVersion + 1
 		time.Sleep(5 * time.Second)
 	}

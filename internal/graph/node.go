@@ -10,6 +10,7 @@ type Node struct {
 	mtx            sync.Mutex
 	Children       []*Node
 	Parent         *Node
+	IsUpdated      bool
 	LastSeen       time.Time
 	Id             string      `json:"id"`
 	ParentId       string      `json:"parentId"`
