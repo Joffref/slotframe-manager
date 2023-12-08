@@ -23,19 +23,37 @@ func NewAPI(config *APIConfig, handlers Handler) (*API, error) {
 		cfg:      config,
 		handlers: handlers,
 	}
-	r := mux.NewRouter()
-	r.Use(loggingMiddleware)
-	err := r.Handle("/register/{parentId}/{id}/{etx}", mux.HandlerFunc(a.Register))
-	if err != nil {
-		return nil, err
-	}
-	err = r.Handle("/version", mux.HandlerFunc(a.Version))
-	if err != nil {
+	r := newRouter()
+	if err := a.registerHandlers(r); err != nil {
 		return nil, err
 	}
 	a.router = r
 	slog.Debug("API created")
 	return a, nil
+}
+
+func newRouter() *mux.Router {
+	r := mux.NewRouter()
+	r.Use(loggingMiddleware)
+	return r
+}
+
+func (a *API) registerHandlers(r *mux.Router) error {
+	err := r.Handle("/register/{parentId}/{id}/{etx}", mux.HandlerFunc(a.Register))
+	if err != nil {
+		return ErrorUnableToRegisterHandler{
+			Pattern: "/register/{parentId}/{id}/{etx}",
+			err:     err,
+		}
+	}
+	err = r.Handle("/version", mux.HandlerFunc(a.Version))
+	if err != nil {
+		return ErrorUnableToRegisterHandler{
+			Pattern: "/version",
+			err:     err,
+		}
+	}
+	return nil
 }
 
 func (a *API) Run() error {

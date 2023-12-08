@@ -17,12 +17,15 @@ func (d *DoDAG) String() string {
 func NewDoDAG() *DoDAG {
 	slog.Debug("Creating a new DoDAG")
 	return &DoDAG{
+		Root:  nil,
 		Nodes: make(map[string]*Node),
 	}
 }
 
 func (d *DoDAG) AddNode(node *Node) {
 	slog.Debug(fmt.Sprintf("Adding %s to the DoDAG", node.String()))
+	fn := node.LockNode()
+	defer fn()
 	if node.ParentId == "" {
 		slog.Debug("Node has no parent, setting it as root")
 		d.Root = node
@@ -30,7 +33,6 @@ func (d *DoDAG) AddNode(node *Node) {
 		return
 	}
 	node.Parent = d.Nodes[node.ParentId]
-	d.Nodes[node.ParentId].Children = append(d.Nodes[node.ParentId].Children, node)
 	d.Nodes[node.Id] = node
 	slog.Debug(fmt.Sprintf("Node %s added to the DoDAG", node.Id))
 }

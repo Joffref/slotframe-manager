@@ -34,7 +34,7 @@ var (
 			if err != nil {
 				log.Fatalf("Error sending request: %v", err)
 			}
-			fmt.Println(resp.Body())
+			fmt.Println(resp.String())
 			var v *api.FrameVersion
 			err = json.NewDecoder(resp.Body()).Decode(&v)
 			if err != nil {
@@ -61,20 +61,18 @@ var (
 			if err != nil {
 				log.Fatalf("Error decoding response: %v", err)
 			}
-			log.Printf("Response: %v", slots)
-			var slots *api.Slots
-			var version *api.FrameVersion
+			var slots api.Slots
+			var version api.FrameVersion
 			for {
 				time.Sleep(1 * time.Second)
 				resp, err = co.Get(ctx, "/version")
 				if err != nil {
 					log.Fatalf("Error sending request: %v", err)
 				}
-				err := json.Unmarshal([]byte(resp.String()), &version)
+				err = json.NewDecoder(resp.Body()).Decode(&version)
 				if err != nil {
 					return err
 				}
-				log.Printf("Response: %v", v)
 				if uint16(version.Version) != slotframeVersion {
 					log.Printf("Version mismatch: %v != %v", v, slotframeVersion)
 					// retrieve slots
@@ -87,7 +85,12 @@ var (
 					if err != nil {
 						log.Fatalf("Error sending request: %v", err)
 					}
-					fmt.Println(resp.String())
+					err = json.NewDecoder(resp.Body()).Decode(&slots)
+					if err != nil {
+						return err
+					}
+					log.Printf("Response: %v", slots)
+					slotframeVersion = uint16(version.Version)
 				}
 			}
 		},

@@ -10,7 +10,6 @@ import (
 	"strconv"
 )
 
-//go:generate mockgen -package api -destination=./mock_api_handler.go . Handler
 type Handler interface {
 	Register(parentId string, id string, etx int, input Slots) (*Slots, error)
 	Version() int
@@ -27,35 +26,37 @@ func (a *API) Register(w mux.ResponseWriter, r *mux.Message) {
 		}
 		return
 	}
-	var registerReponse Slots
-	json.NewDecoder(r.Body()).Decode(&registerReponse)
-	register, err := a.handlers.Register(vars["parentId"], vars["id"], etx, registerReponse)
+	var registerResponse Slots
+	if err = json.NewDecoder(r.Body()).Decode(&registerResponse); err != nil {
+		if err = w.SetResponse(codes.BadRequest, message.TextPlain, bytes.NewReader([]byte(err.Error()))); err != nil {
+			log.Printf("cannot set response: %v", err)
+		}
+		return
+	}
+	register, err := a.handlers.Register(vars["parentId"], vars["id"], etx, registerResponse)
 	if err != nil {
 		log.Printf("cannot register: %v", err)
 		switch err.(type) {
 		case ErrorParentNodeDoesNotExist:
-			err = w.SetResponse(codes.BadRequest, message.TextPlain, bytes.NewReader([]byte(err.Error())))
-			if err != nil {
+			if err = w.SetResponse(codes.BadRequest, message.TextPlain, bytes.NewReader([]byte(err.Error()))); err != nil {
 				log.Printf("cannot set response: %v", err)
 			}
-		}
-		err = w.SetResponse(codes.InternalServerError, message.TextPlain, bytes.NewReader([]byte("cannot register")))
-		if err != nil {
-			log.Printf("cannot set response: %v", err)
+		default:
+			if err = w.SetResponse(codes.InternalServerError, message.TextPlain, bytes.NewReader([]byte("cannot register"))); err != nil {
+				log.Printf("cannot set response: %v", err)
+			}
 		}
 		return
 	}
 	resp, err := json.Marshal(register)
 	if err != nil {
 		log.Printf("cannot marshal response: %v", err)
-		err = w.SetResponse(codes.BadRequest, message.TextPlain, bytes.NewReader([]byte("cannot marshal response")))
-		if err != nil {
+		if err = w.SetResponse(codes.BadRequest, message.TextPlain, bytes.NewReader([]byte("cannot marshal response"))); err != nil {
 			log.Printf("cannot set response: %v", err)
 		}
 		return
 	}
-	err = w.SetResponse(codes.Content, message.AppJSON, bytes.NewReader(resp))
-	if err != nil {
+	if err = w.SetResponse(codes.Content, message.AppJSON, bytes.NewReader(resp)); err != nil {
 		log.Printf("cannot set response: %v", err)
 		return
 	}
@@ -65,17 +66,15 @@ func (a *API) Version(w mux.ResponseWriter, r *mux.Message) {
 	version := FrameVersion{
 		Version: a.handlers.Version(),
 	}
-	resp, err := json.Marshal(version)
+	resp, err := json.Marshal(&version)
 	if err != nil {
 		log.Printf("cannot marshal response: %v", err)
-		err = w.SetResponse(codes.BadRequest, message.TextPlain, bytes.NewReader([]byte("cannot marshal response")))
-		if err != nil {
+		if err = w.SetResponse(codes.BadRequest, message.TextPlain, bytes.NewReader([]byte("cannot marshal response"))); err != nil {
 			log.Printf("cannot set response: %v", err)
 		}
 		return
 	}
-	err = w.SetResponse(codes.Content, message.TextPlain, bytes.NewReader(resp))
-	if err != nil {
+	if err = w.SetResponse(codes.Content, message.AppJSON, bytes.NewReader(resp)); err != nil {
 		log.Printf("cannot set response: %v", err)
 		return
 	}
